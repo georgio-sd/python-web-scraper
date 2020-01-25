@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ################################################################################################
-# Indeed job scraper v0.1
+# Indeed job scraper v0.2 (back end)
 # Jan 12 2020
 ################################################################################################
 import requests
@@ -20,13 +20,16 @@ def write_log(data):
 def extract_jobs(job_list_blocks):
     try:
         cnx = mysql.connector.connect(user='js', password='****',
-                                  host='localhost', database='job_scraper')
+                                      host='localhost', database='job_scraper')
     except mysql.connector.Error as err:
         import sys
         sys.exit(err)
+    added_jobs = 0
+    processed_jobs = 0
     for job_list_block in job_list_blocks:
         #
-        # Grabbing job title and link
+        # Grabing job title and link
+        processed_jobs = processed_jobs + 1
         job_title = job_list_block.find('a', class_='jobtitle turnstileLink')
         if job_title != None:
             job_title_s = str(job_title['title'])
@@ -39,7 +42,7 @@ def extract_jobs(job_list_blocks):
         job_title_s = job_title_s.strip()
         job_link_s = job_link_s.strip()
         #
-        # Grabbing company name
+        # Grabing company name
         job_company = job_list_block.find('span', class_='company')
         if job_company != None:
             job_company_s = str(job_company.text)
@@ -81,14 +84,19 @@ def extract_jobs(job_list_blocks):
                 job_easily_apply_s = 'Y'
             if job_mark_s.strip() == 'Urgently hiring':
                 job_urgently_hiring_s = 'Y'
-        print('EA: ' + job_easily_apply_s)
-        print('UH: ' + job_urgently_hiring_s)
+        #print('EA: ' + job_easily_apply_s)
+        #print('UH: ' + job_urgently_hiring_s)
         #
         # Grabbing job summary
         job_summary = job_list_block.find('div', class_='summary')
         if job_summary != None:
             job_summary_s = str(job_summary)
-            job_summary_s = re.sub(' style=".*"', '', job_summary_s)
+            job_summary_s = re.sub(' style=".*?"', '', job_summary_s)
+            job_summary_s = re.sub('<div class="metadataDiv">.*</div>', '</div>', job_summary_s)
+            if len(job_summary_s) > 400:
+                write_log(job_title_s)
+                write_log(job_company_s)
+                write_log(job_summary_s)
         else:
             job_summary_s = ''
             write_log('\n(!) job_summary not found')
@@ -97,14 +105,14 @@ def extract_jobs(job_list_blocks):
         #
         # Parsing job page
         # Grabbing job description
-        time.sleep(0.2)
+        #time.sleep(0.2)
         page = requests.get('https://indeed.com' + job_link_s)
         soup = BeautifulSoup(page.content, 'html.parser')
         job_full = soup.find('div', class_='jobsearch-JobComponent icl-u-xs-mt--sm')
         job_description = job_full.find('div', class_='jobsearch-jobDescriptionText')
         if job_description != None:
             job_description_s = str(job_description)
-            write_log(job_description_s + '\n')
+            #write_log(job_description_s + '\n')
         else:
             job_description_s = ''
             write_log('\n(!) job_description not found')
@@ -119,19 +127,19 @@ def extract_jobs(job_list_blocks):
             job_offer = job_metadata.find('span',class_='jobsearch-JobMetadataHeader-item icl-u-xs-mt--xs')
             if job_wage != None:
                 job_wage_s = str(job_wage.text)
-                print(job_wage_s)
+                #print(job_wage_s)
             else:
                 write_log('\n(!) job_wage not found')
                 write_log(str(job_metadata))
             if job_offer != None:
                 job_offer_s = str(job_offer.text)
-                print(job_offer_s)
+                #print(job_offer_s)
             else:
                 write_log('\n(!) job_offer not found')
-#                write_log(str(job_metadata))
-        else:
-            write_log('\n(!) job_metadata not found')
-#            write_log(str(job_full))
+                #write_log(str(job_metadata))
+        #else:
+            #write_log('\n(!) job_metadata not found')
+            #write_log(str(job_full))
         #
         # Grabbing company raiting and number of reviews
         job_company_rating_f = 0.0
@@ -140,19 +148,19 @@ def extract_jobs(job_list_blocks):
         job_company_reviews = job_full.find('meta', {'itemprop':'ratingCount'})
         if job_company_rating != None:
             job_company_rating_f = float(job_company_rating['content'])
-            print(job_company_rating_f)
+            #print(job_company_rating_f)
         if job_company_reviews != None:
             job_company_reviews_n = int(job_company_reviews['content'])
-            print(job_company_reviews_n)
+            #print(job_company_reviews_n)
         #
-        # Check if job exist in DB, add if it doesn't, insert it in the DB
+        # Check if job exist in DB, add if it doesn't
         now = datetime.now()
         cursor = cnx.cursor()
-        cursor.execute('select count(*) from jobs where ' + \
-                       'title="' + job_title_s + '" and company="' + job_company_s + '" and location_main="' + job_location_main_s + '"')
+        cursor.execute('select count(*) from jobs where title="' + job_title_s + '" and \
+                        company="' + job_company_s + '" and location_main="' + job_location_main_s + '"')
         job_check = cursor.fetchone()
         if job_check[0] == 0:
-            write_log(job_description_s)
+            added_jobs = added_jobs + 1
             sql = "insert into jobs (title, company, location_main, location, wage, offer, summary, description, \
                                      easily_apply, urgently_hiring, link, company_rating, company_reviews, status, \
                                      submission_date) \
@@ -166,7 +174,9 @@ def extract_jobs(job_list_blocks):
     cnx.commit()
     cursor.close()
     cnx.close()
-
+    return (added_jobs, processed_jobs)
+#
+# Write start event into the log file
 now = datetime.now()
 write_log(now.strftime("[%Y-%m-%d] [%H:%M:%S] Starting..."))
 
@@ -176,19 +186,32 @@ page = requests.get(URL)
 soup = BeautifulSoup(page.content, 'html.parser')
 job_list = soup.find(id='resultsCol')
 job_list_blocks = job_list.find_all('div', class_='jobsearch-SerpJobCard unifiedRow row result', limit=0)
-extract_jobs(job_list_blocks)
-print('Page 1\n')
+(added_jobs, processed_jobs) = extract_jobs(job_list_blocks)
+print('Page 1 has been parsed,')
+print('Processed jobs: ' + str(processed_jobs))
+print('Added jobs    : ' + str(added_jobs) + '\n')
 
 page_list = soup.find('div', class_='pagination')
 if page_list != None:
     page_list_blocks = page_list.findAll('a')
+    parsed_pages = 1
     for page_list_block in page_list_blocks:
-        time.sleep(1)
+        #time.sleep(0.2)
         if page_list_block.find('span', class_='np') == None:
             page_list_url_s = str(page_list_block['href'])
             page = requests.get('https://indeed.com' + page_list_url_s)
             soup = BeautifulSoup(page.content, 'html.parser')
             job_list = soup.find(id='resultsCol')
             job_list_blocks = job_list.findAll('div', class_='jobsearch-SerpJobCard unifiedRow row result', limit=0)
-            extract_jobs(job_list_blocks)
-            print('Next page\n')
+            (i, n) = extract_jobs(job_list_blocks)
+            processed_jobs = processed_jobs + n
+            added_jobs = added_jobs + i
+            parsed_pages = parsed_pages + 1
+            print('Page ' + str(parsed_pages) + 'has been parsed,')
+            print('Processed jobs: ' + str(n))
+            print('Added jobs    : ' + str(i) + '\n')
+
+print('>>> Total info <<<')
+print('Parsed pages  : ' + str(parsed_pages))
+print('Processed jobs: ' + str(processed_jobs))
+print('Added jobs    : ' + str(added_jobs))
