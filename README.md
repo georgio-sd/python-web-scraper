@@ -5,3 +5,5 @@ It saves job seekers' time because they don't need to read repetitive offers.
 * index.py - frontend script, user interface
 * update.py - frontend script, marks job offers as applied, not interested or will check later
 * database-table - MySQL (MirandaDB) database structure
+
+Description https://youtu.be/2L7bsxUteyE
