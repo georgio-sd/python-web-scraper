@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ################################################################################################
-# Indeed job scraper v0.2 (back end)
+# Indeed job scraper v0.3 (back end)
 # Jan 12 2020
 ################################################################################################
 import requests
@@ -12,20 +12,36 @@ from mysql.connector import errorcode
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+# Write to the log file, for debugging
 def write_log(data):
     log_file = open(r"/root/python/webscraper/ws.log","a")
     log_file.write(data + '\n')
     log_file.close()
 
+# Additional filter, which filteres jobs with patterns in the title and the location
+def job_filter(job_title, job_location):
+    def isIn(ps,st):
+        for p in ps:
+            if re.search(p, st):
+                return True
+            return False
+    title_patterns = ['SR.', 'SR ', 'SENIOR', 'LEAD', 'AZURE', 'INTERN']
+    location_patterns = ['New York', 'Boston', 'San Francisco', 'San Jose']
+    if isIn(title_patterns, job_title.upper()) or isIn(location_patterns, job_location):
+        return 'FL'
+    return 'New'
+
+# Extracting jobs from an html page
 def extract_jobs(job_list_blocks):
     try:
-        cnx = mysql.connector.connect(user='js', password='****',
+        cnx = mysql.connector.connect(user='js', password='******',
                                       host='localhost', database='job_scraper')
     except mysql.connector.Error as err:
         import sys
         sys.exit(err)
     added_jobs = 0
     processed_jobs = 0
+    added_new_jobs = 0
     for job_list_block in job_list_blocks:
         #
         # Grabing job title and link
@@ -84,8 +100,6 @@ def extract_jobs(job_list_blocks):
                 job_easily_apply_s = 'Y'
             if job_mark_s.strip() == 'Urgently hiring':
                 job_urgently_hiring_s = 'Y'
-        #print('EA: ' + job_easily_apply_s)
-        #print('UH: ' + job_urgently_hiring_s)
         #
         # Grabbing job summary
         job_summary = job_list_block.find('div', class_='summary')
@@ -112,7 +126,6 @@ def extract_jobs(job_list_blocks):
         job_description = job_full.find('div', class_='jobsearch-jobDescriptionText')
         if job_description != None:
             job_description_s = str(job_description)
-            #write_log(job_description_s + '\n')
         else:
             job_description_s = ''
             write_log('\n(!) job_description not found')
@@ -127,13 +140,11 @@ def extract_jobs(job_list_blocks):
             job_offer = job_metadata.find('span',class_='jobsearch-JobMetadataHeader-item icl-u-xs-mt--xs')
             if job_wage != None:
                 job_wage_s = str(job_wage.text)
-                #print(job_wage_s)
             else:
                 write_log('\n(!) job_wage not found')
                 write_log(str(job_metadata))
             if job_offer != None:
                 job_offer_s = str(job_offer.text)
-                #print(job_offer_s)
             else:
                 write_log('\n(!) job_offer not found')
                 #write_log(str(job_metadata))
@@ -148,10 +159,8 @@ def extract_jobs(job_list_blocks):
         job_company_reviews = job_full.find('meta', {'itemprop':'ratingCount'})
         if job_company_rating != None:
             job_company_rating_f = float(job_company_rating['content'])
-            #print(job_company_rating_f)
         if job_company_reviews != None:
             job_company_reviews_n = int(job_company_reviews['content'])
-            #print(job_company_reviews_n)
         #
         # Check if job exist in DB, add if it doesn't
         now = datetime.now()
@@ -161,40 +170,48 @@ def extract_jobs(job_list_blocks):
         job_check = cursor.fetchone()
         if job_check[0] == 0:
             added_jobs = added_jobs + 1
+            job_status_s = job_filter(job_title_s, job_location_main_s)
+            if job_status_s == 'New':
+                added_new_jobs = added_new_jobs + 1
+            else:
+                write_log(job_status_s + ' - ' + job_title_s)
+                write_log(job_status_s + ' - ' + job_location_main_s)
             sql = "insert into jobs (title, company, location_main, location, wage, offer, summary, description, \
                                      easily_apply, urgently_hiring, link, company_rating, company_reviews, status, \
                                      submission_date) \
                               values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
             val = (job_title_s, job_company_s, job_location_main_s, job_location_s, job_wage_s, job_offer_s, \
                    job_summary_s, job_description_s, job_easily_apply_s, job_urgently_hiring_s, job_link_s, \
-                   job_company_rating_f, job_company_reviews_n, 'New', now.strftime("%Y-%m-%d %H:%M:%S"))
+                   job_company_rating_f, job_company_reviews_n, job_status_s, now.strftime("%Y-%m-%d %H:%M:%S"))
             cursor.execute(sql, val)
     #
     # Close DB connection
     cnx.commit()
     cursor.close()
     cnx.close()
-    return (added_jobs, processed_jobs)
+    return (added_jobs, processed_jobs, added_new_jobs)
 #
 # Write start event into the log file
-now = datetime.now()
-write_log(now.strftime("[%Y-%m-%d] [%H:%M:%S] Starting..."))
+started_time = datetime.now()
+write_log(started_time.strftime("[%Y-%m-%d] [%H:%M:%S] Starting..."))
+print(started_time.strftime("Started at [%H:%M:%S]...\n"))
 
 URL = 'https://www.indeed.com/jobs?as_and=&as_phr=&as_any=&as_not=clearence+clearance+SCI+DOD+TS%2FSCI&as_ttl=devops&as_cmp=&jt=all&st=&as_src=&salary=&radius=25&l=&fromage=1&limit=50&sort=date&psf=advsrch&from=advancedsearch'
-#URL = 'https://www.indeed.com/jobs?as_and=&as_phr=&as_any=&as_not=clearence+clearance+SCI+DOD+TS%2FSCI&as_ttl=devops&as_cmp=&jt=all&st=&as_src=&salary=&radius=25&l=&fromage=7&limit=50&sort=date&psf=advsrch&from=advancedsearch'
 page = requests.get(URL)
 soup = BeautifulSoup(page.content, 'html.parser')
 job_list = soup.find(id='resultsCol')
 job_list_blocks = job_list.find_all('div', class_='jobsearch-SerpJobCard unifiedRow row result', limit=0)
-(added_jobs, processed_jobs) = extract_jobs(job_list_blocks)
+(added_jobs, processed_jobs, added_new_jobs) = extract_jobs(job_list_blocks)
 print('Page 1 has been parsed,')
-print('Processed jobs: ' + str(processed_jobs))
-print('Added jobs    : ' + str(added_jobs) + '\n')
+print('Jobs processed: ' + str(processed_jobs))
+print('Jobs added    : ' + str(added_jobs))
+print('Jobs to check : ' + str(added_new_jobs) + '\n')
+parsed_pages = 1
 
 page_list = soup.find('div', class_='pagination')
 if page_list != None:
     page_list_blocks = page_list.findAll('a')
-    parsed_pages = 1
+    print(str(len(page_list_blocks) - 1) + ' more pages were found\n')
     for page_list_block in page_list_blocks:
         #time.sleep(0.2)
         if page_list_block.find('span', class_='np') == None:
@@ -203,15 +220,22 @@ if page_list != None:
             soup = BeautifulSoup(page.content, 'html.parser')
             job_list = soup.find(id='resultsCol')
             job_list_blocks = job_list.findAll('div', class_='jobsearch-SerpJobCard unifiedRow row result', limit=0)
-            (i, n) = extract_jobs(job_list_blocks)
+            (i, n, x) = extract_jobs(job_list_blocks)
             processed_jobs = processed_jobs + n
             added_jobs = added_jobs + i
+            added_new_jobs = added_new_jobs + x
             parsed_pages = parsed_pages + 1
-            print('Page ' + str(parsed_pages) + 'has been parsed,')
-            print('Processed jobs: ' + str(n))
-            print('Added jobs    : ' + str(i) + '\n')
+            print('Page ' + str(parsed_pages) + ' has been parsed,')
+            print('Jobs processed: ' + str(n))
+            print('Jobs added    : ' + str(i))
+            print('Jobs to check : ' + str(x) + '\n')
 
+finished_time = datetime.now()
+time_diff = finished_time - started_time
 print('>>> Total info <<<')
-print('Parsed pages  : ' + str(parsed_pages))
-print('Processed jobs: ' + str(processed_jobs))
-print('Added jobs    : ' + str(added_jobs))
+print('Pages parsed  : ' + str(parsed_pages))
+print('Jobs processed: ' + str(processed_jobs))
+print('Jobs added    : ' + str(added_jobs))
+print('Jobs to check : ' + str(added_new_jobs))
+print('Speed         : ' + str(round(processed_jobs / time_diff.total_seconds(), 2)) + ' (job/sec)')
+print(finished_time.strftime("\nFinished at [%H:%M:%S]"))

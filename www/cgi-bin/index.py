@@ -107,30 +107,30 @@ img {
 }
 @media screen and (max-width:910px){
     .work-tabs{
-	display:block;
+        display:block;
     }
     .work-preview {
-	width: 100%;
-	display: flex;
-	height:auto;
+        width: 100%;
+        display: flex;
+        height:auto;
     }
     .work-preview-item {
-	width: 100%;
-	min-width: 300px;
-	border: 2px solid #eeee;
-	margin: 0;
+        width: 100%;
+        min-width: 300px;
+        border: 2px solid #eeee;
+        margin: 0;
     }
     .work-full{
-	width: 100%;
+        width: 100%;
     }
     .work-full-item{
-	height:auto;
+        height:auto;
     }
 }
 @media screen and (max-width:768px){
     .vac-btn-block a {
-	width: 100%;
-	margin-bottom: 15px;
+        width: 100%;
+        margin-bottom: 15px;
     }
 }
 @media screen and (max-width:500px){
@@ -160,7 +160,7 @@ img {
               param = $(this).attr('param');
               $.get("/cgi-bin/update.py?"+param, function (data){
                  console.log(data);
-	      });
+              });
 
           });
       });
@@ -178,7 +178,7 @@ def print_file(file_name):
 
 def get_jobs():
     try:
-        cnx = mysql.connector.connect(user='js', password='****',
+        cnx = mysql.connector.connect(user='js', password='*****',
                                       host='localhost', database='job_scraper')
     except mysql.connector.Error as err:
         import sys
@@ -228,7 +228,7 @@ for row in jobs:
         print('<div class="vac-company"><b>' + job_company + '</b> *' + str(job_company_rating) + '</div>')
     else:
         print('<div class="vac-company"><b>' + job_company + '</b></div>')
-    print('<div class="vac-city">' + job_location + '</div>')
+    print('<div class="vac-city">' + job_location_main + '</div>')
     print('<div class="vac-price">' + job_wage + job_offer + '</div>')
     if job_easily_apply=='Y' and job_urgently_hiring=='Y':
         print('<div class="vac-info">Easily Apply - Urgently hiring</div>')
@@ -267,9 +267,9 @@ for row in jobs:
           + job_title + '</a></div>')
     if str(job_company_rating) != '0.0':
         print('<div class="vac-company"><b>' + job_company + '</b> ' + str(job_company_rating) + ' – ' \
-              + str(job_company_reviews) + ' ' + job_location_main + '</div>')
+              + str(job_company_reviews) + ' &nbsp;&nbsp;' + job_location + '</div>')
     else:
-        print('<div class="vac-company"><b>' + job_company + '</b> ' + job_location + '</div>')
+        print('<div class="vac-company"><b>' + job_company + '</b> &nbsp;&nbsp;' + job_location + '</div>')
     print('<div class="vac-price">' + job_wage + job_offer + '</div>')
     if job_easily_apply=='Y' and job_urgently_hiring=='Y':
         print('<div class="vac-info">Easily Apply - Urgently hiring</div>')

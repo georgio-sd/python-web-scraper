@@ -19,7 +19,7 @@ job_id = arguments['id'].value
 job_status = arguments['status'].value
 
 try:
-    cnx = mysql.connector.connect(user='js', password='****',
+    cnx = mysql.connector.connect(user='js', password='*****',
                                   host='localhost', database='job_scraper')
 except mysql.connector.Error as err:
     import sys
