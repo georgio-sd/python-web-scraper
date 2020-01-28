@@ -18,15 +18,16 @@ def write_log(data):
     log_file.write(data + '\n')
     log_file.close()
 
-# Additional filter, which filteres jobs with patterns in the title and the location
+# Additional filter, which filteres jobs with patterns in title and location
 def job_filter(job_title, job_location):
-    def isIn(ps,st):
+    def isIn(ps, st):
         for p in ps:
             if re.search(p, st):
                 return True
-            return False
-    title_patterns = ['SR.', 'SR ', 'SENIOR', 'LEAD', 'AZURE', 'INTERN']
-    location_patterns = ['New York', 'Boston', 'San Francisco', 'San Jose']
+        return False
+    title_patterns = ['SR.', 'SR ', 'SENIOR', 'LEAD', 'PRINCIPAL', 'MANAGER', 'DIRECTOR', 'SOFTWARE ENGINEER', \
+                      'AZURE', 'INTERN', 'JAVA']
+    location_patterns = ['New York', 'Boston', 'Cambridge', 'San Francisco', 'San Jose']
     if isIn(title_patterns, job_title.upper()) or isIn(location_patterns, job_location):
         return 'FL'
     return 'New'
@@ -34,7 +35,7 @@ def job_filter(job_title, job_location):
 # Extracting jobs from an html page
 def extract_jobs(job_list_blocks):
     try:
-        cnx = mysql.connector.connect(user='js', password='******',
+        cnx = mysql.connector.connect(user='js', password='cbbctsnpzsr',
                                       host='localhost', database='job_scraper')
     except mysql.connector.Error as err:
         import sys
@@ -173,9 +174,9 @@ def extract_jobs(job_list_blocks):
             job_status_s = job_filter(job_title_s, job_location_main_s)
             if job_status_s == 'New':
                 added_new_jobs = added_new_jobs + 1
+                write_log('[New] - ' + job_title_s + ' (' + job_location_main_s + ')')
             else:
-                write_log(job_status_s + ' - ' + job_title_s)
-                write_log(job_status_s + ' - ' + job_location_main_s)
+                write_log('[Filtered] - ' + job_title_s + ' (' + job_location_main_s + ')')
             sql = "insert into jobs (title, company, location_main, location, wage, offer, summary, description, \
                                      easily_apply, urgently_hiring, link, company_rating, company_reviews, status, \
                                      submission_date) \
@@ -196,7 +197,7 @@ started_time = datetime.now()
 write_log(started_time.strftime("[%Y-%m-%d] [%H:%M:%S] Starting..."))
 print(started_time.strftime("Started at [%H:%M:%S]...\n"))
 
-URL = 'https://www.indeed.com/jobs?as_and=&as_phr=&as_any=&as_not=clearence+clearance+SCI+DOD+TS%2FSCI&as_ttl=devops&as_cmp=&jt=all&st=&as_src=&salary=&radius=25&l=&fromage=1&limit=50&sort=date&psf=advsrch&from=advancedsearch'
+URL = 'https://www.indeed.com/jobs?as_and=&as_phr=&as_any=&as_not=clearence+clearance+SCI+DOD+TS%2FSCI&as_ttl=devops&as_cmp=&jt=all&st=&as_src=&salary=&radius=25&l=&fromage=2&limit=50&sort=date&psf=advsrch&from=advancedsearch'
 page = requests.get(URL)
 soup = BeautifulSoup(page.content, 'html.parser')
 job_list = soup.find(id='resultsCol')
