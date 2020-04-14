@@ -7,17 +7,18 @@
 import requests
 import re
 import time
-import mysql.connector
+#import mysql.connector
 import hashlib
-from mysql.connector import errorcode
+#from mysql.connector import errorcode
 from datetime import datetime
 from bs4 import BeautifulSoup
 
 # Write to the log file, for debugging
 def write_log(data):
-    log_file = open(r"/root/python/webscraper/ws.log","a")
-    log_file.write(data + '\n')
-    log_file.close()
+     print()
+#    log_file = open(r"/root/python/webscraper/ws.log","a")
+#    log_file.write(data + '\n')
+#    log_file.close()
 
 # Additional filters, which filter jobs with the patterns in title and location
 def job_filter(job_title, job_location):
@@ -34,17 +35,17 @@ def job_filter(job_title, job_location):
     return 'New'
 
 def load_hash():
-    try:
-        cnx = mysql.connector.connect(user='js', password='cbbctsnpzs',
-                                      host='localhost', database='job_scraper')
-    except mysql.connector.Error as err:
-        import sys
-        sys.exit(err)
-    cursor = cnx.cursor()
-    cursor.execute('select id, group_concat(hash) from hashes group by id;')
+##    try:
+##        cnx = mysql.connector.connect(user='js', password='cbbctsnpzs',
+##                                      host='localhost', database='job_scraper')
+##    except mysql.connector.Error as err:
+##        import sys
+##        sys.exit(err)
+##    cursor = cnx.cursor()
+##    cursor.execute('select id, group_concat(hash) from hashes group by id;')
     hash_list_bulk = cursor.fetchall()
-    cursor.close()
-    cnx.close()
+##    cursor.close()
+##    cnx.close()
     hash_list = []
     for i in hash_list_bulk:
         hash_list.append([i[0], [int(n) for n in i[1].split(',')]])
